@@ -67,6 +67,8 @@ def db_env(tmp_path: Path, watched_groups_yaml: Path, monkeypatch):
     monkeypatch.setenv("DATABASE_URL", f"sqlite:///{db_path}")
     monkeypatch.setenv("GROUPS_CONFIG_PATH", str(watched_groups_yaml))
     monkeypatch.setenv("WHAPI_TOKEN", "test-token")
+    # Never spin up the real background scheduler thread in tests.
+    monkeypatch.setenv("ENABLE_SCHEDULER", "false")
 
     config_module.get_settings.cache_clear()
     session_module._engine = None

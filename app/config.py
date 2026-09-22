@@ -39,6 +39,7 @@ class Settings(BaseSettings):
 
     timezone: str = "Asia/Dubai"
     daily_digest_hour: int = 8
+    enable_scheduler: bool = True
 
     retention_days: int = 30
 

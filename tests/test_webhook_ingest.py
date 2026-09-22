@@ -10,7 +10,7 @@ def test_text_message_is_persisted(app_client):
     response = app_client.post("/webhook/whapi", json=payload)
 
     assert response.status_code == 200
-    assert response.json() == {"ingested": 1, "skipped": 0}
+    assert response.json() == {"ingested": 1, "skipped": 0, "commands_handled": 0}
 
     with session_scope() as session:
         row = session.get(Message, "p.w30M7fgwWD4XwHu.g4CA-gBgTwl0rVw")
@@ -25,7 +25,7 @@ def test_duplicate_message_id_is_not_reinserted(app_client):
     app_client.post("/webhook/whapi", json=payload)
     second_response = app_client.post("/webhook/whapi", json=payload)
 
-    assert second_response.json() == {"ingested": 0, "skipped": 1}
+    assert second_response.json() == {"ingested": 0, "skipped": 1, "commands_handled": 0}
 
     with session_scope() as session:
         count = session.query(Message).count()
@@ -58,7 +58,7 @@ def test_unwatched_group_is_skipped(app_client):
     payload = load_fixture("webhook_unwatched_group.json")
     response = app_client.post("/webhook/whapi", json=payload)
 
-    assert response.json() == {"ingested": 0, "skipped": 1}
+    assert response.json() == {"ingested": 0, "skipped": 1, "commands_handled": 0}
 
     with session_scope() as session:
         row = session.get(Message, "p.unwatched001")

@@ -48,8 +48,18 @@ python -m venv .venv && ./.venv/Scripts/pip install -e ".[dev]"   # setup (Windo
     match current Anthropic pricing) and logs it per run.
   - Prompts live in `prompts/*.md` (`$name`-style placeholders via `string.Template`), not inline
     in code, so they're tunable without touching Python.
-- `app/delivery/` — the 08:00 Asia/Dubai scheduled digest and the self-chat `/digest`, `/groups`
-  command handlers.
+- `app/delivery/` —
+  - `scheduler.py` (`run_daily_digest`, `create_scheduler`): an APScheduler cron job at
+    `DAILY_DIGEST_HOUR` in `Settings.timezone` that builds the last-24h digest and sends it to
+    `self_chat_id`. Started/stopped in `app/api.py`'s FastAPI lifespan, gated by
+    `ENABLE_SCHEDULER` (tests always disable it).
+  - `commands.py` (`is_self_command`, `parse_command`, `handle_command`): recognizes `/digest
+    <1d|3d|7d> [group]` and `/groups` sent from the user's own number to their own chat
+    (`chat_id == self_chat_id and from_me`) and returns the reply text. Wired into
+    `app/ingest/webhook.py`, which sends the reply back through Whapi — the only other place a
+    `send_text` call is ever made.
+  - `POST /admin/run-digest` (in `app/api.py`) manually triggers `run_daily_digest`; guarded to
+    localhost/TestClient via `is_local_client`.
 - `groups.yaml` — the group watchlist (id, name, enabled, notes). Source of truth; only enabled
   groups are ingested or backfilled.
 
@@ -68,8 +78,9 @@ python -m venv .venv && ./.venv/Scripts/pip install -e ".[dev]"   # setup (Windo
 
 ## Status
 Phase 1 (skeleton, config, DB models, Whapi client, webhook ingest), Phase 2 (backfill CLI,
-`groups` listing CLI, groups.yaml -> DB sync), and Phase 3 (two-pass summarizer, `digest` CLI) are
-done and tested against a synthetic UAE construction-project group fixture
-(`tests/fixtures/construction_group_day.json`) and a stub Anthropic client
-(`tests/fake_anthropic.py`) — no live Anthropic call has been made yet. Phases 4-5 (delivery,
-packaging) are tracked in the original project plan.
+`groups` listing CLI, groups.yaml -> DB sync), Phase 3 (two-pass summarizer, `digest` CLI), and
+Phase 4 (scheduled + on-demand delivery) are done and tested against a synthetic UAE
+construction-project group fixture (`tests/fixtures/construction_group_day.json`), a stub
+Anthropic client (`tests/fake_anthropic.py`), and mocked Whapi HTTP calls (`respx`) — no live
+Anthropic or Whapi call has been made yet. Phase 5 (Docker Compose, README, retention job) is
+tracked in the original project plan.
