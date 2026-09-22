@@ -1,0 +1,23 @@
+{
+  "messages": [
+    {
+      "id": "p.unwatched001",
+      "from_me": false,
+      "type": "text",
+      "chat_id": "120363999999999999@g.us",
+      "chat_name": "Random Group I'm Not Tracking",
+      "timestamp": 1712995500,
+      "source": "mobile",
+      "text": {
+        "body": "Should never be stored"
+      },
+      "from": "919984351847",
+      "from_name": "Gerald"
+    }
+  ],
+  "event": {
+    "type": "messages",
+    "event": "post"
+  },
+  "channel_id": "MANTIS-M72HC"
+}

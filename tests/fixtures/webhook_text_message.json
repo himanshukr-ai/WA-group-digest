@@ -1,0 +1,23 @@
+{
+  "messages": [
+    {
+      "id": "p.w30M7fgwWD4XwHu.g4CA-gBgTwl0rVw",
+      "from_me": false,
+      "type": "text",
+      "chat_id": "120363000000000001@g.us",
+      "chat_name": "Site A Coordination",
+      "timestamp": 1712995245,
+      "source": "mobile",
+      "text": {
+        "body": "Hello world"
+      },
+      "from": "919984351847",
+      "from_name": "Gerald"
+    }
+  ],
+  "event": {
+    "type": "messages",
+    "event": "post"
+  },
+  "channel_id": "MANTIS-M72HC"
+}

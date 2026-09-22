@@ -1,0 +1,31 @@
+{
+  "messages": [
+    {
+      "id": "p.reply001",
+      "from_me": false,
+      "type": "text",
+      "chat_id": "120363000000000001@g.us",
+      "chat_name": "Site A Coordination",
+      "timestamp": 1712995300,
+      "source": "mobile",
+      "text": {
+        "body": "Agreed, let's push it to Thursday"
+      },
+      "from": "971501234567",
+      "from_name": "Fatima",
+      "context": {
+        "quoted_id": "p.w30M7fgwWD4XwHu.g4CA-gBgTwl0rVw",
+        "quoted_author": "919984351847",
+        "quoted_type": "text",
+        "quoted_content": {
+          "body": "Hello world"
+        }
+      }
+    }
+  ],
+  "event": {
+    "type": "messages",
+    "event": "post"
+  },
+  "channel_id": "MANTIS-M72HC"
+}

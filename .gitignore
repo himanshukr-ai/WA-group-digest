@@ -1,0 +1,10 @@
+.venv/
+__pycache__/
+*.pyc
+.env
+digest.db
+*.db
+.pytest_cache/
+uvicorn.log
+groups.yaml.local
+*.egg-info/

@@ -1,0 +1,23 @@
+{
+  "messages": [
+    {
+      "id": "p.lid001",
+      "from_me": false,
+      "type": "text",
+      "chat_id": "120363000000000001@g.us",
+      "chat_name": "Site A Coordination",
+      "timestamp": 1712995400,
+      "source": "mobile",
+      "text": {
+        "body": "The delivery is delayed again"
+      },
+      "from": "1524746986546@lid",
+      "from_name": "Anonymous Admin"
+    }
+  ],
+  "event": {
+    "type": "messages",
+    "event": "post"
+  },
+  "channel_id": "MANTIS-M72HC"
+}
