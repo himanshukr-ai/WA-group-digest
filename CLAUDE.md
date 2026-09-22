@@ -23,6 +23,7 @@ python -m venv .venv && ./.venv/Scripts/pip install -e ".[dev]"   # setup (Windo
 ./.venv/Scripts/python -m app serve                                  # run the webhook server
 ./.venv/Scripts/python -m app groups                                  # list Whapi groups (find IDs for groups.yaml)
 ./.venv/Scripts/python -m app backfill --days 7 [--group <id-or-name>]  # pull message history
+./.venv/Scripts/python -m app digest --window 3d [--group <id-or-name>]  # print a merged digest
 ```
 
 ## Architecture
@@ -34,8 +35,19 @@ python -m venv .venv && ./.venv/Scripts/pip install -e ".[dev]"   # setup (Windo
   (pydantic models mirroring Whapi's message/group/webhook payloads).
 - `app/ingest/` — `persist.py` (shared message persistence + `@lid` sender-name fallback used by
   both the webhook and backfill paths) and `webhook.py` (FastAPI router for incoming events).
-- `app/summarize/` — two-pass summarizer (per-group/per-day JSON, then a merged digest for the
-  requested window). Prompts live in `prompts/*.md`, not inline in code.
+- `app/summarize/` — two-pass summarizer:
+  - `pass1.py` formats one group/day of messages, calls Claude with a forced tool call
+    (`record_summary`) against a strict JSON schema, and chunks+merges when a day is too long
+    for one call (`CHUNK_CHAR_BUDGET`).
+  - `cache.py` caches pass-1 output in `daily_summaries` keyed by `(group_id, summary_date)` —
+    re-running a digest for a date that's already been summarized costs nothing.
+  - `pass2.py` (`build_digest`) pulls the cached per-day JSON for a window, asks Claude to merge
+    it into one readable digest (mentions-of-user and open questions to them first, then
+    per-group sections), and returns `(digest_text, usage)`.
+  - `usage.py` estimates cost from `Settings.anthropic_price_*_per_mtok` (approximate — update to
+    match current Anthropic pricing) and logs it per run.
+  - Prompts live in `prompts/*.md` (`$name`-style placeholders via `string.Template`), not inline
+    in code, so they're tunable without touching Python.
 - `app/delivery/` — the 08:00 Asia/Dubai scheduled digest and the self-chat `/digest`, `/groups`
   command handlers.
 - `groups.yaml` — the group watchlist (id, name, enabled, notes). Source of truth; only enabled
@@ -55,6 +67,9 @@ python -m venv .venv && ./.venv/Scripts/pip install -e ".[dev]"   # setup (Windo
 - Log token usage and estimated cost per digest run.
 
 ## Status
-Phase 1 (skeleton, config, DB models, Whapi client, webhook ingest) and Phase 2 (backfill CLI,
-`groups` listing CLI, groups.yaml -> DB sync) are done and tested. Phases 3-5 (summarizer,
-delivery, packaging) are tracked in the original project plan.
+Phase 1 (skeleton, config, DB models, Whapi client, webhook ingest), Phase 2 (backfill CLI,
+`groups` listing CLI, groups.yaml -> DB sync), and Phase 3 (two-pass summarizer, `digest` CLI) are
+done and tested against a synthetic UAE construction-project group fixture
+(`tests/fixtures/construction_group_day.json`) and a stub Anthropic client
+(`tests/fake_anthropic.py`) — no live Anthropic call has been made yet. Phases 4-5 (delivery,
+packaging) are tracked in the original project plan.

@@ -23,10 +23,17 @@ class Settings(BaseSettings):
 
     anthropic_api_key: str = ""
     anthropic_model: str = "claude-sonnet-5"
+    # Approximate list pricing, USD per million tokens. Update to match the current
+    # Anthropic pricing page for the configured model -- these are not fetched live.
+    anthropic_price_input_per_mtok: float = 3.0
+    anthropic_price_output_per_mtok: float = 15.0
 
     database_url: str = "sqlite:///./digest.db"
 
     self_number: str = ""
+    # How the user is referred to / addressed in group chats, so pass-1 summarization
+    # can flag messages that mention or concern them.
+    user_display_name: str = ""
 
     webhook_base_url: str = ""
 

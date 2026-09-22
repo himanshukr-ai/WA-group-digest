@@ -69,6 +69,36 @@ def cmd_backfill(args: argparse.Namespace) -> None:
         print(f"{group_id}: {inserted} new messages")
 
 
+def cmd_digest(args: argparse.Namespace) -> None:
+    import sys
+
+    import anthropic
+
+    from app.summarize.pass2 import build_digest, parse_window
+
+    settings = get_settings()
+    if not settings.anthropic_api_key:
+        print("ANTHROPIC_API_KEY is not set.", file=sys.stderr)
+        raise SystemExit(1)
+
+    window_days = parse_window(args.window)
+    groups = settings.load_groups()
+
+    init_db()
+    with session_scope() as session:
+        sync_groups(session, groups)
+
+    client = anthropic.Anthropic(api_key=settings.anthropic_api_key)
+    with session_scope() as session:
+        digest_text, usage = build_digest(session, client, settings, groups, window_days, focus_group=args.group)
+
+    print(digest_text)
+    print(
+        f"\n---\ntokens: {usage['input_tokens']} in / {usage['output_tokens']} out  ~${usage['cost']:.4f}",
+        file=sys.stderr,
+    )
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(prog="app")
     subparsers = parser.add_subparsers(dest="command", required=True)
@@ -81,6 +111,10 @@ def main() -> None:
     backfill_parser.add_argument("--days", type=int, default=7, help="How many days of history to pull")
     backfill_parser.add_argument("--group", type=str, default=None, help="Limit to one group (id or name)")
 
+    digest_parser = subparsers.add_parser("digest", help="Print a merged digest for a time window")
+    digest_parser.add_argument("--window", type=str, default="1d", help="1d, 3d, 7d, or a number of days")
+    digest_parser.add_argument("--group", type=str, default=None, help="Limit to one group (id or name)")
+
     args = parser.parse_args()
 
     commands = {
@@ -88,6 +122,7 @@ def main() -> None:
         "serve": cmd_serve,
         "groups": cmd_groups,
         "backfill": cmd_backfill,
+        "digest": cmd_digest,
     }
     commands[args.command](args)
 

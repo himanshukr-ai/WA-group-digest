@@ -1,0 +1,20 @@
+[
+  {"sender": "Khalid (PM)", "time": "07:02", "text": "Good morning all"},
+  {"sender": "Ali (Site Eng)", "time": "07:15", "text": "Rebar delivery for level 4 inspected this morning, all good, matches the drawings."},
+  {"sender": "Fatima (Site Eng)", "time": "07:20", "text": "👍"},
+  {"sender": "Ali (Site Eng)", "time": "08:05", "text": "Formwork for column C12 completed today, pour scheduled for tomorrow morning."},
+  {"sender": "Sara (Procurement)", "time": "09:10", "text": "Heads up, the cement delivery is delayed again. Third time this month."},
+  {"sender": "Ali (Site Eng)", "time": "09:14", "text": "This is a customs clearance issue, not the supplier's fault. I checked with the freight agent myself."},
+  {"sender": "Sara (Procurement)", "time": "09:20", "text": "I disagree, we've had this exact supplier miss two other deliveries this quarter even before this one. I think we should drop them."},
+  {"sender": "Khalid (PM)", "time": "09:45", "text": "ok noted"},
+  {"sender": "Khalid (PM)", "time": "10:30", "text": "Decision: we're switching to the backup cement supplier starting Monday. Sara please issue the PO today."},
+  {"sender": "Sara (Procurement)", "time": "10:32", "text": "On it."},
+  {"sender": "Ali (Site Eng)", "time": "11:50", "text": "Safety incident: a worker slipped near the scaffolding on level 3 around 11:30, minor ankle injury, he's been sent to the site clinic."},
+  {"sender": "Khalid (PM)", "time": "11:55", "text": "Is he ok? Keep me posted."},
+  {"sender": "Ali (Site Eng)", "time": "11:58", "text": "Yes, conscious and walking, just precautionary."},
+  {"sender": "Fatima (Site Eng)", "time": "12:10", "text": "Do we need to redo the toolbox talk for scaffolding safety given this is the second slip near that area this month?"},
+  {"sender": "Khalid (PM)", "time": "14:20", "text": "Client meeting update: client agreed to extend the completion date by 2 weeks because of the cement delay. Confirmed in writing."},
+  {"sender": "Khalid (PM)", "time": "14:25", "text": "Can someone loop in Himanshu on the cost implications of the 2-week extension before Thursday?"},
+  {"sender": "Sara (Procurement)", "time": "14:40", "text": "Here are the photos from today's inspection: https://example.com/site-photos/2026-09-20"},
+  {"sender": "Fatima (Site Eng)", "time": "15:00", "text": "noted"}
+]
