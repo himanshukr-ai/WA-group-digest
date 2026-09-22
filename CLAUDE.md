@@ -25,8 +25,10 @@ python -m venv .venv && ./.venv/Scripts/pip install -e ".[dev]"   # setup (Windo
 ./.venv/Scripts/python -m app backfill --days 7 [--group <id-or-name>]  # pull message history
 ./.venv/Scripts/python -m app digest --window 3d [--group <id-or-name>]  # print a merged digest
 ./.venv/Scripts/python -m app retention                                    # delete messages past RETENTION_DAYS
+./.venv/Scripts/python -m app register-webhook                               # register this app's webhook with Whapi
 
-docker compose up -d --build   # run app + Postgres (see README.md)
+docker compose up -d --build   # run app + Postgres on a VPS (see README.md)
+# or deploy to Railway -- see README.md "Deploy" section
 ```
 
 ## Architecture
@@ -69,7 +71,17 @@ docker compose up -d --build   # run app + Postgres (see README.md)
   via `python -m app retention`.
 - `groups.yaml` — the group watchlist (id, name, enabled, notes). Source of truth; only enabled
   groups are ingested or backfilled.
-- `Dockerfile` / `docker-compose.yml` — app + Postgres for a VPS deploy; see `README.md`.
+- `app/whapi/webhook_setup.py` (`register_webhook`) — appends/updates *only this app's* entry
+  (matched by URL) in the Whapi channel's `webhooks` array via `PATCH /settings`. **Never replaces
+  the whole array** — this Whapi channel is shared with at least one other app (a "Zendox"
+  service, also on Railway), so blindly overwriting `webhooks` would silently break it. Always go
+  through this function (or `python -m app register-webhook`), never set the webhook URL by hand
+  in the Whapi dashboard.
+- `Dockerfile` / `docker-compose.yml` / `railway.json` — deploy configs; see `README.md`. Deployed
+  target is Railway (Postgres plugin, custom domain); `app/db/session.py::_normalize_database_url`
+  rewrites the plain `postgres://`/`postgresql://` URL Railway's Postgres plugin provides to use
+  the installed `psycopg` driver. `cmd_serve` reads `$PORT` (Railway assigns it dynamically),
+  falling back to 8000 locally.
 
 ## Conventions
 - Never send messages into a WhatsApp group — the bot is read-only there. Sends only ever target
@@ -85,15 +97,19 @@ docker compose up -d --build   # run app + Postgres (see README.md)
 - Log token usage and estimated cost per digest run.
 
 ## Status
-All 5 phases from the original plan are built and tested: skeleton/config/DB/webhook ingest
-(Phase 1), backfill + `groups` CLI (Phase 2), two-pass summarizer + `digest` CLI (Phase 3),
-scheduled + on-demand delivery (Phase 4), and Docker packaging + retention + README (Phase 5).
-Tests run against a synthetic UAE construction-project group fixture
-(`tests/fixtures/construction_group_day.json`), a stub Anthropic client
-(`tests/fake_anthropic.py`), and mocked Whapi HTTP calls (`respx`).
+All 5 phases from the original plan are built and tested, and the app has been verified live
+against the real Whapi API, a real linked WhatsApp number, and real Claude calls: `python -m app
+groups` lists all real groups, `backfill`/`digest` work against real message history for the
+watchlisted "SM - GenAI" group, and a real digest was sent to and received on WhatsApp via
+`run_daily_digest`.
 
-**Not yet live-verified** — no real `WHAPI_TOKEN` or `ANTHROPIC_API_KEY` has been used:
-- No real Whapi channel, QR link, or webhook delivery.
-- No real Claude call — digest quality/prompt tuning hasn't been eyeballed on real output.
+Two live-testing bugs were found and fixed (see git log): `GroupParticipant.id`/`rank` needed to
+be optional (Whapi omits `id` for privacy-hidden participants), and pass1/pass2 needed
+`output_config.effort` set explicitly + a larger `max_tokens` -- Claude Sonnet 5 runs adaptive
+thinking on by default, billed out of the same `max_tokens` budget, and was silently consuming the
+entire response before any digest text got written.
+
+**Still not yet verified:**
+- Real webhook delivery (`register-webhook` + a live deploy) — see README.md step 7 (Railway).
 - The Postgres path (`psycopg`) is packaging-checked but hasn't run against a live Postgres.
-See `README.md` for the setup steps to close these out.
+- Retention has only been unit-tested, not run against real aged data.

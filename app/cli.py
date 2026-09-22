@@ -14,9 +14,13 @@ def cmd_init_db(args: argparse.Namespace) -> None:
 
 
 def cmd_serve(args: argparse.Namespace) -> None:
+    import os
+
     import uvicorn
 
-    uvicorn.run("app.api:app", host="0.0.0.0", port=8000, reload=args.reload)
+    # Platforms like Railway assign the port dynamically via $PORT.
+    port = int(os.environ.get("PORT", 8000))
+    uvicorn.run("app.api:app", host="0.0.0.0", port=port, reload=args.reload)
 
 
 def cmd_groups(args: argparse.Namespace) -> None:
@@ -100,6 +104,26 @@ def cmd_digest(args: argparse.Namespace) -> None:
     )
 
 
+def cmd_register_webhook(args: argparse.Namespace) -> None:
+    from app.whapi.client import WhapiClient
+    from app.whapi.webhook_setup import register_webhook
+
+    settings = get_settings()
+    if not settings.webhook_base_url:
+        print("WEBHOOK_BASE_URL is not set in .env.", file=sys.stderr)
+        raise SystemExit(1)
+
+    with WhapiClient(settings) as client:
+        result = register_webhook(client, settings)
+
+    target = settings.webhook_base_url.rstrip("/") + "/webhook/whapi"
+    if result == "already_registered":
+        print(f"Already registered: {target}")
+    else:
+        print(f"Registered: {target}")
+        print("Any other apps' webhooks already configured on this channel were left untouched.")
+
+
 def cmd_retention(args: argparse.Namespace) -> None:
     from app.db.retention import purge_old_messages
 
@@ -134,6 +158,10 @@ def main() -> None:
     digest_parser.add_argument("--group", type=str, default=None, help="Limit to one group (id or name)")
 
     subparsers.add_parser("retention", help="Delete raw messages past RETENTION_DAYS (summaries are kept)")
+    subparsers.add_parser(
+        "register-webhook",
+        help="Append this app's webhook to the Whapi channel (does not touch other apps' webhooks)",
+    )
 
     args = parser.parse_args()
 
@@ -144,6 +172,7 @@ def main() -> None:
         "backfill": cmd_backfill,
         "digest": cmd_digest,
         "retention": cmd_retention,
+        "register-webhook": cmd_register_webhook,
     }
     commands[args.command](args)
 

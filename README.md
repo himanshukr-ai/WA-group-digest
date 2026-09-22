@@ -85,7 +85,35 @@ mode "Body", and subscribe to the `messages` event. Send a message in a watchlis
 `/groups` / `/digest 1d` to your own chat) and confirm it's picked up — `python -m app serve`
 logs each webhook POST.
 
-## 7. Deploy to a VPS
+## 7. Deploy
+
+### Option A: Railway (recommended — no server/TLS setup needed)
+
+1. In the [Railway dashboard](https://railway.app), create a project and connect it to this
+   GitHub repo. Railway detects the `Dockerfile` and `railway.json` automatically (builder,
+   healthcheck path).
+2. Add a **Postgres** plugin to the project. Railway injects `DATABASE_URL` (as a plain
+   `postgres://...` URL) into the app service automatically — the app normalizes that to the
+   `psycopg` driver itself, no manual edit needed.
+3. In the app service's **Variables**, set everything from `.env.example` *except*
+   `DATABASE_URL` (Railway's Postgres plugin already provides it) and `WEBHOOK_BASE_URL` (set it
+   to your public URL — see step 5). Railway also injects `$PORT`; `python -m app serve` already
+   reads it.
+4. Under **Settings → Networking**, add your custom domain and point its CNAME at Railway per
+   their instructions. Railway provisions TLS automatically. (A generated `*.up.railway.app`
+   domain works too if you don't need a custom one yet.)
+5. Set `WEBHOOK_BASE_URL` to that domain (e.g. `https://digest.yourdomain.com`, no trailing
+   slash) and redeploy.
+6. **Important if this Whapi channel is shared with another app:** don't set the webhook URL by
+   hand in the Whapi dashboard — that overwrites the *entire* webhooks list, which would delete
+   any other app's webhook on the same channel. Instead run:
+   ```bash
+   ./.venv/Scripts/python -m app register-webhook
+   ```
+   This only ever appends/updates *this app's* entry (matched by URL) in Whapi's `webhooks` array
+   and leaves every other entry untouched. Safe to re-run any time the URL changes.
+
+### Option B: Your own VPS (Docker Compose)
 
 ```bash
 git clone <this repo> && cd whatsapp-digest-bot
@@ -94,10 +122,10 @@ docker compose up -d --build
 ```
 
 This runs the app behind Postgres (`docker-compose.yml`), keeping message history and daily
-summaries in `db_data`. Point the Whapi webhook URL at `https://<your-domain-or-ip>:8000/webhook/whapi`
-(put a reverse proxy with TLS in front for a real domain — Whapi requires HTTPS for the
-webhook URL in production). `groups.yaml` is mounted read-only, so you can edit it on the host and
-restart the `app` container to pick up changes:
+summaries in `db_data`. Put a reverse proxy with TLS (Whapi requires HTTPS in production) in front
+pointing at port 8000, set `WEBHOOK_BASE_URL` in `.env` to that public URL, then run
+`python -m app register-webhook` the same way as above. `groups.yaml` is mounted read-only, so you
+can edit it on the host and restart the `app` container to pick up changes:
 
 ```bash
 docker compose restart app
@@ -105,7 +133,7 @@ docker compose restart app
 
 **Note:** the Postgres path (via `psycopg`) has been checked for import/packaging correctness but
 not exercised against a live Postgres instance in this environment — worth a smoke test
-(`docker compose up`, then `python -m app groups` from inside the container) before relying on it.
+(`docker compose up` or a Railway deploy, then `python -m app groups`) before relying on it.
 
 ## Daily operation
 

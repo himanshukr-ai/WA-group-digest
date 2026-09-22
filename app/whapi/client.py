@@ -90,3 +90,11 @@ class WhapiClient:
     def send_text(self, to: str, body: str) -> dict:
         response = self._request("POST", "/messages/text", json={"to": to, "body": body})
         return response.json()
+
+    def get_channel_settings(self) -> dict:
+        response = self._request("GET", "/settings")
+        return response.json()
+
+    def update_channel_settings(self, payload: dict) -> dict:
+        response = self._request("PATCH", "/settings", json=payload)
+        return response.json()
