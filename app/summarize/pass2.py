@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import datetime as dt
 import json
+import logging
 from zoneinfo import ZoneInfo
 
 from sqlalchemy.orm import Session
@@ -11,6 +12,8 @@ from app.summarize.cache import get_or_build_daily_summary
 from app.summarize.pass1 import AnthropicLike
 from app.summarize.prompts import render_prompt
 from app.summarize.usage import log_usage
+
+logger = logging.getLogger(__name__)
 
 WINDOW_ALIASES = {"1d": 1, "3d": 3, "7d": 7}
 
@@ -83,13 +86,23 @@ def build_digest(
 
     response = client.messages.create(
         model=settings.anthropic_model,
-        max_tokens=2048,
+        max_tokens=8000,
+        # Rephrasing/merging already-structured JSON, not open-ended reasoning -- keep
+        # effort (and thus adaptive-thinking token spend) low so the max_tokens budget
+        # goes to the digest text itself rather than being eaten by thinking.
+        output_config={"effort": "low"},
         system=system,
         messages=[{"role": "user", "content": user}],
     )
     digest_text = "".join(block.text for block in response.content if block.type == "text")
     total_input_tokens += response.usage.input_tokens
     total_output_tokens += response.usage.output_tokens
+
+    if not digest_text:
+        logger.warning(
+            "pass2 produced no text content (stop_reason=%s) -- likely ran out of max_tokens",
+            response.stop_reason,
+        )
 
     cost = log_usage("digest", total_input_tokens, total_output_tokens, settings)
     usage = {"input_tokens": total_input_tokens, "output_tokens": total_output_tokens, "cost": cost}

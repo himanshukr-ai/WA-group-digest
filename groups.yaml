@@ -1,7 +1,7 @@
 # Watchlist of WhatsApp groups the bot should ingest and summarize.
 # `id` must match the Whapi chat id (ends in @g.us). Get it from `python -m app groups`.
 groups:
-  - id: "REPLACE_WITH_GROUP_ID@g.us"
-    name: "Example Group"
-    enabled: false
+  - id: "120363132939230512@g.us"
+    name: "SM - GenAI"
+    enabled: true
     notes: ""

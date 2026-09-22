@@ -138,13 +138,23 @@ def _call_pass1(
     )
     response = client.messages.create(
         model=settings.anthropic_model,
-        max_tokens=4096,
+        max_tokens=8000,
+        # This is bounded extraction against a fixed schema, not open-ended reasoning --
+        # low effort keeps latency/cost down and, more importantly, leaves the max_tokens
+        # budget for the actual tool call instead of adaptive thinking (on by default on
+        # this model family and billed out of the same budget).
+        output_config={"effort": "low"},
         system=system,
         messages=[{"role": "user", "content": user}],
         tools=[RECORD_SUMMARY_TOOL],
         tool_choice={"type": "tool", "name": "record_summary"},
     )
-    tool_use = next(block for block in response.content if block.type == "tool_use")
+    tool_use = next((block for block in response.content if block.type == "tool_use"), None)
+    if tool_use is None:
+        raise RuntimeError(
+            f"pass1: no tool_use block in response (stop_reason={response.stop_reason}); "
+            "the model likely ran out of max_tokens before calling record_summary"
+        )
     return tool_use.input, response.usage.input_tokens, response.usage.output_tokens
 
 
