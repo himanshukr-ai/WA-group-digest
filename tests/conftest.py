@@ -31,7 +31,8 @@ groups:
 
 
 @pytest.fixture
-def app_client(tmp_path: Path, watched_groups_yaml: Path, monkeypatch):
+def db_env(tmp_path: Path, watched_groups_yaml: Path, monkeypatch):
+    """Point Settings/the DB at isolated per-test paths. Yields the settings module for convenience."""
     db_path = tmp_path / "test.db"
     monkeypatch.setenv("DATABASE_URL", f"sqlite:///{db_path}")
     monkeypatch.setenv("GROUPS_CONFIG_PATH", str(watched_groups_yaml))
@@ -41,11 +42,16 @@ def app_client(tmp_path: Path, watched_groups_yaml: Path, monkeypatch):
     session_module._engine = None
     session_module._SessionLocal = None
 
-    from app.api import app
-
-    with TestClient(app) as client:
-        yield client
+    yield config_module
 
     config_module.get_settings.cache_clear()
     session_module._engine = None
     session_module._SessionLocal = None
+
+
+@pytest.fixture
+def app_client(db_env):
+    from app.api import app
+
+    with TestClient(app) as client:
+        yield client

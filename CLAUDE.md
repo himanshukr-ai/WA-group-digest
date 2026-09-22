@@ -21,6 +21,8 @@ python -m venv .venv && ./.venv/Scripts/pip install -e ".[dev]"   # setup (Windo
 ./.venv/Scripts/python -m pytest tests/                            # run tests
 ./.venv/Scripts/python -m app init-db                               # create tables
 ./.venv/Scripts/python -m app serve                                  # run the webhook server
+./.venv/Scripts/python -m app groups                                  # list Whapi groups (find IDs for groups.yaml)
+./.venv/Scripts/python -m app backfill --days 7 [--group <id-or-name>]  # pull message history
 ```
 
 ## Architecture
@@ -53,6 +55,6 @@ python -m venv .venv && ./.venv/Scripts/pip install -e ".[dev]"   # setup (Windo
 - Log token usage and estimated cost per digest run.
 
 ## Status
-Phase 1 (skeleton, config, DB models, Whapi client, webhook ingest) is done and tested against
-fixtures derived from the current Whapi docs. Phases 2-5 (backfill, summarizer, delivery,
-packaging) are tracked in the original project plan.
+Phase 1 (skeleton, config, DB models, Whapi client, webhook ingest) and Phase 2 (backfill CLI,
+`groups` listing CLI, groups.yaml -> DB sync) are done and tested. Phases 3-5 (summarizer,
+delivery, packaging) are tracked in the original project plan.
