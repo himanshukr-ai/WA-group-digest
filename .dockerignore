@@ -5,7 +5,6 @@ __pycache__/
 digest.db
 *.db
 .pytest_cache/
-uvicorn.log
-groups.yaml.local
+.git/
+tests/
 *.egg-info/
-build/

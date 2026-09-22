@@ -15,7 +15,7 @@ def cmd_init_db(args: argparse.Namespace) -> None:
 def cmd_serve(args: argparse.Namespace) -> None:
     import uvicorn
 
-    uvicorn.run("app.api:app", host="0.0.0.0", port=8000, reload=True)
+    uvicorn.run("app.api:app", host="0.0.0.0", port=8000, reload=args.reload)
 
 
 def cmd_groups(args: argparse.Namespace) -> None:
@@ -99,11 +99,22 @@ def cmd_digest(args: argparse.Namespace) -> None:
     )
 
 
+def cmd_retention(args: argparse.Namespace) -> None:
+    from app.db.retention import purge_old_messages
+
+    settings = get_settings()
+    init_db()
+    with session_scope() as session:
+        deleted = purge_old_messages(session, settings)
+    print(f"Deleted {deleted} messages older than {settings.retention_days} days.")
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(prog="app")
     subparsers = parser.add_subparsers(dest="command", required=True)
 
-    subparsers.add_parser("serve", help="Run the FastAPI app with uvicorn")
+    serve_parser = subparsers.add_parser("serve", help="Run the FastAPI app with uvicorn")
+    serve_parser.add_argument("--reload", action="store_true", default=False, help="Auto-reload on code changes (dev only)")
     subparsers.add_parser("init-db", help="Create database tables")
     subparsers.add_parser("groups", help="List WhatsApp groups visible to this Whapi channel")
 
@@ -115,6 +126,8 @@ def main() -> None:
     digest_parser.add_argument("--window", type=str, default="1d", help="1d, 3d, 7d, or a number of days")
     digest_parser.add_argument("--group", type=str, default=None, help="Limit to one group (id or name)")
 
+    subparsers.add_parser("retention", help="Delete raw messages past RETENTION_DAYS (summaries are kept)")
+
     args = parser.parse_args()
 
     commands = {
@@ -123,6 +136,7 @@ def main() -> None:
         "groups": cmd_groups,
         "backfill": cmd_backfill,
         "digest": cmd_digest,
+        "retention": cmd_retention,
     }
     commands[args.command](args)
 

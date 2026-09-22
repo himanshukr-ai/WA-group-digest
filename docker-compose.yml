@@ -1,0 +1,33 @@
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: digest
+      POSTGRES_USER: digest
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-digest}
+    volumes:
+      - db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U digest -d digest"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  app:
+    build: .
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: postgresql+psycopg://digest:${POSTGRES_PASSWORD:-digest}@db:5432/digest
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./groups.yaml:/app/groups.yaml:ro
+
+volumes:
+  db_data:

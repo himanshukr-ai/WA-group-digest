@@ -24,6 +24,9 @@ python -m venv .venv && ./.venv/Scripts/pip install -e ".[dev]"   # setup (Windo
 ./.venv/Scripts/python -m app groups                                  # list Whapi groups (find IDs for groups.yaml)
 ./.venv/Scripts/python -m app backfill --days 7 [--group <id-or-name>]  # pull message history
 ./.venv/Scripts/python -m app digest --window 3d [--group <id-or-name>]  # print a merged digest
+./.venv/Scripts/python -m app retention                                    # delete messages past RETENTION_DAYS
+
+docker compose up -d --build   # run app + Postgres (see README.md)
 ```
 
 ## Architecture
@@ -60,8 +63,13 @@ python -m venv .venv && ./.venv/Scripts/pip install -e ".[dev]"   # setup (Windo
     `send_text` call is ever made.
   - `POST /admin/run-digest` (in `app/api.py`) manually triggers `run_daily_digest`; guarded to
     localhost/TestClient via `is_local_client`.
+- `app/db/retention.py` (`purge_old_messages`) deletes raw `messages` rows older than
+  `RETENTION_DAYS`; `daily_summaries` are never deleted. Runs daily at 03:00 local time (a job in
+  the same scheduler as the digest, added in `app/delivery/scheduler.py::create_scheduler`) and
+  via `python -m app retention`.
 - `groups.yaml` — the group watchlist (id, name, enabled, notes). Source of truth; only enabled
   groups are ingested or backfilled.
+- `Dockerfile` / `docker-compose.yml` — app + Postgres for a VPS deploy; see `README.md`.
 
 ## Conventions
 - Never send messages into a WhatsApp group — the bot is read-only there. Sends only ever target
@@ -77,10 +85,15 @@ python -m venv .venv && ./.venv/Scripts/pip install -e ".[dev]"   # setup (Windo
 - Log token usage and estimated cost per digest run.
 
 ## Status
-Phase 1 (skeleton, config, DB models, Whapi client, webhook ingest), Phase 2 (backfill CLI,
-`groups` listing CLI, groups.yaml -> DB sync), Phase 3 (two-pass summarizer, `digest` CLI), and
-Phase 4 (scheduled + on-demand delivery) are done and tested against a synthetic UAE
-construction-project group fixture (`tests/fixtures/construction_group_day.json`), a stub
-Anthropic client (`tests/fake_anthropic.py`), and mocked Whapi HTTP calls (`respx`) — no live
-Anthropic or Whapi call has been made yet. Phase 5 (Docker Compose, README, retention job) is
-tracked in the original project plan.
+All 5 phases from the original plan are built and tested: skeleton/config/DB/webhook ingest
+(Phase 1), backfill + `groups` CLI (Phase 2), two-pass summarizer + `digest` CLI (Phase 3),
+scheduled + on-demand delivery (Phase 4), and Docker packaging + retention + README (Phase 5).
+Tests run against a synthetic UAE construction-project group fixture
+(`tests/fixtures/construction_group_day.json`), a stub Anthropic client
+(`tests/fake_anthropic.py`), and mocked Whapi HTTP calls (`respx`).
+
+**Not yet live-verified** — no real `WHAPI_TOKEN` or `ANTHROPIC_API_KEY` has been used:
+- No real Whapi channel, QR link, or webhook delivery.
+- No real Claude call — digest quality/prompt tuning hasn't been eyeballed on real output.
+- The Postgres path (`psycopg`) is packaging-checked but hasn't run against a live Postgres.
+See `README.md` for the setup steps to close these out.

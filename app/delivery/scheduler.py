@@ -6,6 +6,7 @@ from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.cron import CronTrigger
 
 from app.config import Settings, get_settings
+from app.db.retention import purge_old_messages
 from app.db.session import session_scope
 from app.summarize.pass1 import AnthropicLike
 from app.summarize.pass2 import build_digest
@@ -44,6 +45,13 @@ def run_daily_digest(settings: Settings | None = None, anthropic_client: Anthrop
     )
 
 
+def run_retention(settings: Settings | None = None) -> int:
+    """Delete raw messages past Settings.retention_days. Daily summaries are kept forever."""
+    settings = settings or get_settings()
+    with session_scope() as session:
+        return purge_old_messages(session, settings)
+
+
 def create_scheduler(settings: Settings | None = None) -> BackgroundScheduler:
     settings = settings or get_settings()
     scheduler = BackgroundScheduler(timezone=settings.timezone)
@@ -52,6 +60,15 @@ def create_scheduler(settings: Settings | None = None) -> BackgroundScheduler:
         trigger=CronTrigger(hour=settings.daily_digest_hour, minute=0, timezone=settings.timezone),
         args=[settings],
         id="daily_digest",
+        replace_existing=True,
+    )
+    # Runs a few hours before the digest so a shrinking retention window never races the digest
+    # that still needs today's (and the window's) messages.
+    scheduler.add_job(
+        run_retention,
+        trigger=CronTrigger(hour=3, minute=0, timezone=settings.timezone),
+        args=[settings],
+        id="retention",
         replace_existing=True,
     )
     return scheduler
