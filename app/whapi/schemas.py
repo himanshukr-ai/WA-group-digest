@@ -47,8 +47,11 @@ class WebhookPayload(BaseModel):
 
 
 class GroupParticipant(BaseModel):
-    id: str
-    rank: str
+    # Whapi omits `id` for participants whose number is hidden by group/community privacy
+    # settings (see the @lid handling in app/ingest/persist.py) -- we don't rely on individual
+    # participant ids today, only participants_count, so we just tolerate the gap.
+    id: str | None = None
+    rank: str | None = None
 
 
 class WhapiGroup(BaseModel):

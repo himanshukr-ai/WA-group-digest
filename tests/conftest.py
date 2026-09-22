@@ -69,6 +69,13 @@ def db_env(tmp_path: Path, watched_groups_yaml: Path, monkeypatch):
     monkeypatch.setenv("WHAPI_TOKEN", "test-token")
     # Never spin up the real background scheduler thread in tests.
     monkeypatch.setenv("ENABLE_SCHEDULER", "false")
+    # Settings falls back to reading a real .env from the cwd for anything not set here. Blank
+    # out everything else so tests are hermetic regardless of what's in the developer's actual
+    # .env -- individual tests can still monkeypatch.setenv a specific value on top of this.
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "")
+    monkeypatch.setenv("SELF_NUMBER", "")
+    monkeypatch.setenv("USER_DISPLAY_NAME", "")
+    monkeypatch.setenv("WEBHOOK_BASE_URL", "")
 
     config_module.get_settings.cache_clear()
     session_module._engine = None

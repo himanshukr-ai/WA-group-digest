@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import sys
 
 from app.config import get_settings
 from app.db.session import init_db, session_scope
@@ -110,6 +111,12 @@ def cmd_retention(args: argparse.Namespace) -> None:
 
 
 def main() -> None:
+    # Group/message text routinely contains emoji; Windows consoles default to a legacy
+    # codepage (cp1252) that can't encode it, so force UTF-8 on stdout/stderr up front.
+    if sys.stdout.encoding and sys.stdout.encoding.lower() != "utf-8":
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+        sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+
     parser = argparse.ArgumentParser(prog="app")
     subparsers = parser.add_subparsers(dest="command", required=True)
 
