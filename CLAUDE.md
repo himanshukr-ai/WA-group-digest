@@ -45,7 +45,11 @@ docker compose up -d --build   # run app + Postgres on a VPS (see README.md)
     (`record_summary`) against a strict JSON schema, and chunks+merges when a day is too long
     for one call (`CHUNK_CHAR_BUDGET`).
   - `cache.py` caches pass-1 output in `daily_summaries` keyed by `(group_id, summary_date)` —
-    re-running a digest for a date that's already been summarized costs nothing.
+    re-running a digest for a date that's already been summarized costs nothing. **Only completed
+    days are cached**: today is rebuilt every time and never stored, and a cached row whose
+    `created_at` predates the end of its day is discarded (it was built from a partial day).
+    `build_digest` with no `end_date` covers N full days + today so far; the scheduled digest
+    passes `end_date=yesterday`.
   - `pass2.py` (`build_digest`) pulls the cached per-day JSON for a window, asks Claude to merge
     it into one readable digest (mentions-of-user and open questions to them first, then
     per-group sections), and returns `(digest_text, usage)`.

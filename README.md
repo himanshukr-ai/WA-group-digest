@@ -138,9 +138,13 @@ not exercised against a live Postgres instance in this environment — worth a s
 ## Daily operation
 
 - **Scheduled digest:** every day at `DAILY_DIGEST_HOUR` (default 8) in `TIMEZONE` (default
-  `Asia/Dubai`), the last 24h are summarized and sent to your own chat.
+  `Asia/Dubai`), *yesterday* (the last complete calendar day) is summarized and sent to your own
+  chat. Each message lands in exactly one scheduled digest, up to about a day after it was sent.
 - **On demand:** from your own WhatsApp chat, send `/digest 1d`, `/digest 3d`, `/digest 7d <group
-  name>`, or `/groups`.
+  name>`, or `/groups`. `Nd` means the last N full days **plus today so far**, so `/digest 1d`
+  at 8am shows yesterday and the morning's messages.
+- **Caching:** only completed days are cached (so a digest never freezes a half-finished day);
+  today is always summarized fresh.
 - **Retention:** raw messages older than `RETENTION_DAYS` (default 30) are deleted daily at 03:00
   local time; daily summaries are kept indefinitely so history stays queryable even after raw
   messages are purged. Run it manually with `python -m app retention`.

@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import datetime as dt
 import logging
+from zoneinfo import ZoneInfo
 
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.cron import CronTrigger
@@ -16,7 +18,12 @@ logger = logging.getLogger(__name__)
 
 
 def run_daily_digest(settings: Settings | None = None, anthropic_client: AnthropicLike | None = None) -> None:
-    """Build the last-24h digest and send it to the user's own WhatsApp chat."""
+    """Build the digest for yesterday (the last complete day) and send it to the user's own chat.
+
+    Yesterday rather than "today so far": at 08:00 today has only a few hours of messages, and
+    each message then lands in exactly one scheduled digest with no overlap or gaps. For anything
+    more recent, use /digest.
+    """
     settings = settings or get_settings()
 
     if not settings.self_chat_id:
@@ -32,9 +39,12 @@ def run_daily_digest(settings: Settings | None = None, anthropic_client: Anthrop
         anthropic_client = anthropic.Anthropic(api_key=settings.anthropic_api_key)
 
     groups = settings.load_groups()
+    yesterday = dt.datetime.now(ZoneInfo(settings.timezone)).date() - dt.timedelta(days=1)
 
     with session_scope() as session:
-        digest_text, usage = build_digest(session, anthropic_client, settings, groups, window_days=1)
+        digest_text, usage = build_digest(
+            session, anthropic_client, settings, groups, window_days=1, end_date=yesterday
+        )
 
     with WhapiClient(settings) as client:
         client.send_text(settings.self_chat_id, digest_text)

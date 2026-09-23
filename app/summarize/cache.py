@@ -24,18 +24,28 @@ def get_or_build_daily_summary(
     group: GroupConfig,
     date: dt.date,
 ) -> tuple[DailySummary, bool]:
-    """Return the cached DailySummary for (group, date), generating and caching it if missing.
+    """Return the DailySummary for (group, date), generating and caching it if missing.
 
-    Returns (row, was_cached).
+    Only *completed* days are cached: a summary built while its day was still in progress is
+    incomplete, so today's is always rebuilt fresh and never stored, and any cached row that was
+    created before its day ended is discarded. Returns (row, was_cached).
     """
+    tz = ZoneInfo(settings.timezone)
+    start, end = _day_bounds_utc(date, tz)
+
     existing = session.execute(
         select(DailySummary).where(DailySummary.group_id == group.id, DailySummary.summary_date == date)
     ).scalar_one_or_none()
     if existing is not None:
-        return existing, True
+        created_at = existing.created_at
+        if created_at.tzinfo is None:  # SQLite hands back naive datetimes; we store UTC
+            created_at = created_at.replace(tzinfo=dt.timezone.utc)
+        if created_at >= end:
+            return existing, True
+        session.delete(existing)
+        session.flush()
 
-    tz = ZoneInfo(settings.timezone)
-    start, end = _day_bounds_utc(date, tz)
+    day_is_over = dt.datetime.now(dt.timezone.utc) >= end
     messages = list(
         session.execute(
             select(Message)
@@ -54,6 +64,7 @@ def get_or_build_daily_summary(
         input_tokens=input_tokens,
         output_tokens=output_tokens,
     )
-    session.add(row)
-    session.flush()
+    if day_is_over:
+        session.add(row)
+        session.flush()
     return row, False

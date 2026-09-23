@@ -37,8 +37,8 @@ def test_run_daily_digest_sends_to_self_chat(db_env, monkeypatch):
     with session_scope() as session:
         sync_groups(session, settings.load_groups())
         group = settings.load_groups()[0]
-        today = dt.datetime.now(tz).date()
-        for m in load_construction_group_messages(today, tz, group_id=group.id, group_name=group.name):
+        yesterday = dt.datetime.now(tz).date() - dt.timedelta(days=1)  # the scheduled digest covers yesterday
+        for m in load_construction_group_messages(yesterday, tz, group_id=group.id, group_name=group.name):
             session.add(m)
 
     fake_client = FakeAnthropicClient(

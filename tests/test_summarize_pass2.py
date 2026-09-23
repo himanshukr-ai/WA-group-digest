@@ -115,6 +115,37 @@ def test_build_digest_second_run_only_pays_for_pass2(db_env):
     assert usage["output_tokens"] == 200
 
 
+def test_default_window_is_n_full_days_plus_today_so_far(db_env):
+    init_db()
+    settings = get_settings()
+    with session_scope() as session:
+        sync_groups(session, settings.load_groups())
+    group = settings.load_groups()[0]
+
+    today = dt.datetime.now(TZ).date()
+    with session_scope() as session:
+        for label, day in (("y", today - dt.timedelta(days=1)), ("t", today)):
+            for m in load_construction_group_messages(day, TZ, group_id=group.id, group_name=group.name):
+                m.message_id = f"{label}-{m.message_id}"
+                session.add(m)
+
+    client = FakeAnthropicClient(
+        [
+            FakeResponse(content=[FakeToolUseBlock(input=PASS1_SUMMARY)], usage=FakeUsage(input_tokens=1, output_tokens=1)),
+            FakeResponse(content=[FakeToolUseBlock(input=PASS1_SUMMARY)], usage=FakeUsage(input_tokens=1, output_tokens=1)),
+            FakeResponse(content=[FakeTextBlock(text="DIGEST")], usage=FakeUsage(input_tokens=1, output_tokens=1)),
+        ]
+    )
+    with session_scope() as session:
+        digest_text, _ = build_digest(session, client, settings, settings.load_groups(), window_days=1)
+
+    assert digest_text == "DIGEST"
+    assert len(client.messages.calls) == 3  # yesterday + today pass1, then the merge
+    pass2_prompt = client.messages.calls[-1]["messages"][0]["content"]
+    assert (today - dt.timedelta(days=1)).isoformat() in pass2_prompt
+    assert today.isoformat() in pass2_prompt
+
+
 def test_build_digest_with_no_messages_reports_nothing(db_env):
     init_db()
     settings = get_settings()

@@ -40,11 +40,19 @@ def build_digest(
     focus_group: str | None = None,
     end_date: dt.date | None = None,
 ) -> tuple[str, dict]:
-    """Merge cached per-day summaries for the window ending on `end_date` (default: today) into
-    one digest. Returns (digest_text, usage)."""
+    """Merge per-day summaries into one digest. Returns (digest_text, usage).
+
+    With no `end_date` (on-demand use) the window is the last `window_days` *full* days plus
+    today so far, so "1d" at 8am still shows yesterday. With an explicit `end_date` the window is
+    exactly `window_days` days ending on that date (the scheduled digest passes yesterday).
+    """
     tz = ZoneInfo(settings.timezone)
-    end_date = end_date or dt.datetime.now(tz).date()
-    dates = sorted(end_date - dt.timedelta(days=i) for i in range(window_days))
+    if end_date is None:
+        end_date = dt.datetime.now(tz).date()
+        num_days = window_days + 1
+    else:
+        num_days = window_days
+    dates = sorted(end_date - dt.timedelta(days=i) for i in range(num_days))
 
     target_groups = [g for g in groups if g.enabled]
     if focus_group:
@@ -74,7 +82,7 @@ def build_digest(
         }
         return "Nothing to report for this window.", usage
 
-    window_description = f"last {window_days} day{'s' if window_days != 1 else ''} ({dates[0].isoformat()} to {dates[-1].isoformat()})"
+    window_description = f"{dates[0].isoformat()} to {dates[-1].isoformat()}"
 
     system = render_prompt("pass2_system.md")
     user = render_prompt(
