@@ -10,6 +10,7 @@ from apscheduler.triggers.cron import CronTrigger
 from app.config import Settings, get_settings
 from app.db.retention import purge_old_messages
 from app.db.session import session_scope
+from app.db.sync_groups import load_groups_from_db
 from app.summarize.pass1 import AnthropicLike
 from app.summarize.pass2 import build_digest
 from app.whapi.client import WhapiClient
@@ -38,10 +39,10 @@ def run_daily_digest(settings: Settings | None = None, anthropic_client: Anthrop
 
         anthropic_client = anthropic.Anthropic(api_key=settings.anthropic_api_key)
 
-    groups = settings.load_groups()
     yesterday = dt.datetime.now(ZoneInfo(settings.timezone)).date() - dt.timedelta(days=1)
 
     with session_scope() as session:
+        groups = load_groups_from_db(session)
         digest_text, usage = build_digest(
             session, anthropic_client, settings, groups, window_days=1, end_date=yesterday
         )

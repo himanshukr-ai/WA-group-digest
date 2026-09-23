@@ -5,7 +5,16 @@ import sys
 
 from app.config import get_settings
 from app.db.session import init_db, session_scope
-from app.db.sync_groups import sync_groups
+from app.db.sync_groups import load_groups_from_db, seed_groups_if_empty
+
+
+def _load_watchlist(settings) -> list:
+    """The DB is the source of truth; groups.yaml only seeds an empty watchlist."""
+    init_db()
+    with session_scope() as session:
+        seed_groups_if_empty(session, settings.load_groups())
+    with session_scope() as session:
+        return load_groups_from_db(session)
 
 
 def cmd_init_db(args: argparse.Namespace) -> None:
@@ -24,11 +33,11 @@ def cmd_serve(args: argparse.Namespace) -> None:
 
 
 def cmd_groups(args: argparse.Namespace) -> None:
-    """List the WhatsApp groups visible to this Whapi channel, to help populate groups.yaml."""
+    """List the WhatsApp groups visible to this Whapi channel, to help build the watchlist."""
     from app.whapi.client import WhapiClient
 
     settings = get_settings()
-    watchlist_ids = {g.id for g in settings.load_groups()}
+    watchlist_ids = {g.id for g in _load_watchlist(settings)}
 
     with WhapiClient(settings) as client:
         offset = 0
@@ -44,7 +53,7 @@ def cmd_groups(args: argparse.Namespace) -> None:
                 break
             offset += count
 
-    print("\n* = already in groups.yaml watchlist")
+    print("\n* = already on the watchlist")
 
 
 def cmd_backfill(args: argparse.Namespace) -> None:
@@ -52,22 +61,18 @@ def cmd_backfill(args: argparse.Namespace) -> None:
     from app.whapi.client import WhapiClient
 
     settings = get_settings()
-    groups = settings.load_groups()
+    groups = _load_watchlist(settings)
     if args.group:
         groups = [g for g in groups if g.id == args.group or g.name == args.group]
         if not groups:
-            print(f"No group in groups.yaml matches {args.group!r}")
+            print(f"No group on the watchlist matches {args.group!r}")
             return
-
-    init_db()
-    with session_scope() as session:
-        sync_groups(session, settings.load_groups())
 
     with WhapiClient(settings) as client, session_scope() as session:
         results = backfill_groups(client, session, groups, days=args.days)
 
     if not results:
-        print("No enabled groups to backfill. Check groups.yaml.")
+        print("No enabled groups to backfill. Add one to the watchlist first.")
         return
 
     for group_id, inserted in results.items():
@@ -87,11 +92,7 @@ def cmd_digest(args: argparse.Namespace) -> None:
         raise SystemExit(1)
 
     window_days = parse_window(args.window)
-    groups = settings.load_groups()
-
-    init_db()
-    with session_scope() as session:
-        sync_groups(session, groups)
+    groups = _load_watchlist(settings)
 
     client = anthropic.Anthropic(api_key=settings.anthropic_api_key)
     with session_scope() as session:

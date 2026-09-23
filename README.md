@@ -47,8 +47,11 @@ to develop or run the test suite.
 ./.venv/Scripts/python -m app groups
 ```
 
-This lists every WhatsApp group visible to your linked number, with its Whapi chat ID. Copy the
-ones you want summarized into `groups.yaml`:
+This lists every WhatsApp group visible to your linked number, with its Whapi chat ID. (Once the
+app is deployed, the [admin page](#admin-page) does this from a browser — you can skip this step.)
+Copy the ones you want summarized into `groups.yaml`. **The database is the source of truth for
+the watchlist; `groups.yaml` only seeds it the first time the app starts with an empty watchlist**
+and is never re-applied afterwards, so edits made in the admin page survive redeploys:
 
 ```yaml
 groups:
@@ -134,6 +137,27 @@ docker compose restart app
 **Note:** the Postgres path (via `psycopg`) has been checked for import/packaging correctness but
 not exercised against a live Postgres instance in this environment — worth a smoke test
 (`docker compose up` or a Railway deploy, then `python -m app groups`) before relying on it.
+
+## Admin page
+
+`https://<your-domain>/admin` lets you, from a browser (works on a phone too):
+
+- **Add groups** — pick from every group on your linked WhatsApp number (searchable).
+- **Enable / disable** a group. Takes effect immediately, with no redeploy: disabled groups are
+  skipped by the webhook, the daily digest, and `/digest`. History is kept.
+- **Backfill** any group for 1–30 days. It runs in the background and shows progress; it's safe
+  to run repeatedly.
+
+It is protected by HTTP Basic auth and is **off unless you set a password**:
+
+1. In Railway → the app service → Variables, set `ADMIN_PASSWORD` to a long random value (and
+   optionally `ADMIN_USERNAME`, default `admin`). Set it there, not in chat or in a committed file.
+2. Redeploy, open `/admin`, and sign in with the browser's login prompt.
+
+With no `ADMIN_PASSWORD`, `/admin` returns 404. Anyone with the password can spend your Claude
+and Whapi quota, so treat it like a credential; Basic auth has no logout or lockout, so use a
+strong one. To use it locally, put `ADMIN_PASSWORD` in `.env`, run `python -m app serve`, and open
+`http://localhost:8000/admin`.
 
 ## Daily operation
 

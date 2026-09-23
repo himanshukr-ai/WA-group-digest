@@ -76,6 +76,8 @@ def db_env(tmp_path: Path, watched_groups_yaml: Path, monkeypatch):
     monkeypatch.setenv("SELF_NUMBER", "")
     monkeypatch.setenv("USER_DISPLAY_NAME", "")
     monkeypatch.setenv("WEBHOOK_BASE_URL", "")
+    monkeypatch.setenv("ADMIN_USERNAME", "admin")
+    monkeypatch.setenv("ADMIN_PASSWORD", "")
 
     config_module.get_settings.cache_clear()
     session_module._engine = None

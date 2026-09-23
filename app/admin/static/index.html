@@ -1,0 +1,265 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>WhatsApp Digest admin</title>
+<style>
+  :root {
+    --bg: #f6f7f9; --panel: #ffffff; --text: #1a1d21; --muted: #6b7280; --line: #e3e6ea;
+    --accent: #1f7a4d; --accent-text: #ffffff; --danger: #b42318; --danger-bg: #fdecea; --ok: #1f7a4d;
+    --chip: #eef1f4;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #101316; --panel: #181c20; --text: #e8eaed; --muted: #98a1ac; --line: #2a3037;
+      --accent: #3fb27f; --accent-text: #08130d; --danger: #f28b82; --danger-bg: #3a1d1b; --ok: #3fb27f;
+      --chip: #232930;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 15px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  main { max-width: 980px; margin: 0 auto; padding: 24px 16px 64px; }
+  h1 { font-size: 22px; margin: 0 0 4px; }
+  h2 { font-size: 16px; margin: 0; }
+  .sub { color: var(--muted); margin: 0 0 20px; }
+  section { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 16px; margin-bottom: 20px; }
+  .head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 12px; flex-wrap: wrap; }
+  .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 12px; color: var(--muted); word-break: break-all; }
+  .row { display: grid; grid-template-columns: 1fr auto; gap: 10px 16px; padding: 12px 0; border-top: 1px solid var(--line); align-items: center; }
+  .row:first-child { border-top: 0; }
+  .name { font-weight: 600; overflow-wrap: anywhere; }
+  .meta { color: var(--muted); font-size: 13px; margin-top: 2px; }
+  .controls { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
+  button, select, input[type=search] { font: inherit; color: var(--text); background: var(--panel); border: 1px solid var(--line); border-radius: 7px; padding: 6px 10px; }
+  input[type=search] { min-width: 240px; }
+  button { cursor: pointer; }
+  button.primary { background: var(--accent); color: var(--accent-text); border-color: var(--accent); font-weight: 600; }
+  button:disabled { opacity: .55; cursor: default; }
+  .status { font-size: 13px; color: var(--muted); }
+  .status.ok { color: var(--ok); } .status.err { color: var(--danger); }
+  .chip { display: inline-block; background: var(--chip); border-radius: 999px; padding: 1px 8px; font-size: 12px; color: var(--muted); margin-left: 6px; }
+  .toggle { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: var(--muted); }
+  .banner { background: var(--danger-bg); color: var(--danger); border-radius: 8px; padding: 10px 12px; margin-bottom: 16px; display: none; }
+  .empty { color: var(--muted); padding: 8px 0; }
+  .picker { max-height: 420px; overflow: auto; }
+  @media (max-width: 640px) { .row { grid-template-columns: 1fr; } .controls { justify-content: flex-start; } input[type=search] { min-width: 0; width: 100%; } }
+</style>
+</head>
+<body>
+<main>
+  <h1>WhatsApp Digest admin</h1>
+  <p class="sub">Choose which groups are summarized, and pull in message history for any of them.</p>
+  <div id="banner" class="banner" role="alert"></div>
+
+  <section>
+    <div class="head">
+      <h2>Watchlist <span id="watch-count" class="chip"></span></h2>
+      <button id="reload-watch" type="button">Refresh</button>
+    </div>
+    <div id="watchlist"><div class="empty">Loading…</div></div>
+  </section>
+
+  <section>
+    <div class="head">
+      <h2>Add groups from WhatsApp</h2>
+      <div class="controls">
+        <input id="filter" type="search" placeholder="Search your groups…" aria-label="Search your groups">
+        <button id="reload-whapi" type="button">Reload from WhatsApp</button>
+      </div>
+    </div>
+    <div id="picker" class="picker"><div class="empty">Loading your groups…</div></div>
+    <p class="sub" style="margin:12px 0 0">Every enabled group is included in the daily digest, and busy groups cost more to summarize.</p>
+  </section>
+</main>
+
+<script>
+"use strict";
+
+// Group names come from WhatsApp, so any group admin can choose them. Everything below is built
+// with textContent / createTextNode -- never innerHTML -- so a hostile name can't inject markup.
+function h(tag, props, ...children) {
+  const el = document.createElement(tag);
+  for (const [key, value] of Object.entries(props || {})) {
+    if (key === "class") el.className = value;
+    else if (key.startsWith("on")) el.addEventListener(key.slice(2), value);
+    else if (key in el) el[key] = value;
+    else el.setAttribute(key, value);
+  }
+  for (const child of children.flat()) {
+    if (child == null || child === false) continue;
+    el.append(child.nodeType ? child : document.createTextNode(String(child)));
+  }
+  return el;
+}
+
+async function api(path, options = {}) {
+  const response = await fetch("/admin/api" + path, {
+    method: options.method || "GET",
+    headers: { "Content-Type": "application/json" },
+    body: options.body === undefined ? undefined : JSON.stringify(options.body),
+  });
+  if (!response.ok) {
+    let message = response.statusText || "Request failed";
+    try {
+      const data = await response.json();
+      message = typeof data.detail === "string" ? data.detail : JSON.stringify(data.detail);
+    } catch (_) { /* keep statusText */ }
+    throw new Error(message);
+  }
+  return response.json();
+}
+
+const state = { groups: [], whapi: [], whapiLoaded: false, pollers: new Map() };
+const bannerEl = document.getElementById("banner");
+
+function showError(message) {
+  bannerEl.textContent = message;
+  bannerEl.style.display = "block";
+}
+function clearError() { bannerEl.style.display = "none"; }
+async function guarded(fn) {
+  try { clearError(); return await fn(); } catch (error) { showError(error.message); }
+}
+
+function relativeTime(iso) {
+  if (!iso) return "no messages yet";
+  const seconds = Math.max(0, (Date.now() - new Date(iso).getTime()) / 1000);
+  if (seconds < 90) return "just now";
+  const units = [[86400, "d"], [3600, "h"], [60, "m"]];
+  for (const [size, label] of units) if (seconds >= size) return Math.floor(seconds / size) + label + " ago";
+  return "just now";
+}
+
+// ---- watchlist -------------------------------------------------------------------------------
+
+function backfillStatus(group) {
+  const job = group.backfill;
+  if (!job) return { text: "", cls: "" };
+  if (job.status === "running") return { text: `Backfilling ${job.days} days…`, cls: "" };
+  if (job.status === "done") return { text: `Done: ${job.inserted} new messages`, cls: "ok" };
+  return { text: "Failed: " + job.error, cls: "err" };
+}
+
+function renderWatchlist() {
+  const root = document.getElementById("watchlist");
+  document.getElementById("watch-count").textContent = state.groups.length;
+  if (!state.groups.length) {
+    root.replaceChildren(h("div", { class: "empty" }, "No groups yet. Add one below."));
+    return;
+  }
+  root.replaceChildren(...state.groups.map((group) => {
+    const running = group.backfill && group.backfill.status === "running";
+    const days = h("select", { "aria-label": "Days of history" },
+      [1, 3, 7, 14, 30].map((n) => h("option", { value: String(n), selected: n === 7 }, n === 1 ? "1 day" : n + " days")));
+    const status = backfillStatus(group);
+    return h("div", { class: "row" },
+      h("div", {},
+        h("div", { class: "name" }, group.name),
+        h("div", { class: "mono" }, group.id),
+        h("div", { class: "meta" }, `${group.message_count.toLocaleString()} messages stored · last ${relativeTime(group.last_message_at)}`)),
+      h("div", { class: "controls" },
+        h("label", { class: "toggle" },
+          h("input", { type: "checkbox", checked: group.enabled, onchange: (e) => setEnabled(group, e.target.checked) }),
+          group.enabled ? "Enabled" : "Disabled"),
+        days,
+        h("button", { type: "button", disabled: running, onclick: () => startBackfill(group, Number(days.value)) }, "Backfill"),
+        h("span", { class: "status " + status.cls }, status.text)));
+  }));
+}
+
+async function loadGroups() {
+  state.groups = await api("/groups");
+  renderWatchlist();
+  for (const group of state.groups) {
+    if (group.backfill && group.backfill.status === "running") pollJob(group.id, group.backfill.id);
+  }
+}
+
+async function setEnabled(group, enabled) {
+  await guarded(async () => {
+    await api("/groups/" + encodeURIComponent(group.id), { method: "PATCH", body: { enabled } });
+    await loadGroups();
+  });
+  renderWatchlist();
+}
+
+async function startBackfill(group, days) {
+  await guarded(async () => {
+    const { job_id } = await api(`/groups/${encodeURIComponent(group.id)}/backfill`, { method: "POST", body: { days } });
+    await loadGroups();
+    pollJob(group.id, job_id);
+  });
+}
+
+function pollJob(groupId, jobId) {
+  if (state.pollers.has(groupId)) return;
+  const timer = setInterval(async () => {
+    try {
+      const job = await api("/jobs/" + jobId);
+      if (job.status !== "running") {
+        clearInterval(timer);
+        state.pollers.delete(groupId);
+        await loadGroups();
+      }
+    } catch (error) {
+      clearInterval(timer);
+      state.pollers.delete(groupId);
+      showError(error.message);
+    }
+  }, 1500);
+  state.pollers.set(groupId, timer);
+}
+
+// ---- add groups ------------------------------------------------------------------------------
+
+function renderPicker() {
+  const root = document.getElementById("picker");
+  if (!state.whapiLoaded) return;
+  const query = document.getElementById("filter").value.trim().toLowerCase();
+  const matches = state.whapi.filter((g) => !query || g.name.toLowerCase().includes(query));
+  if (!matches.length) {
+    root.replaceChildren(h("div", { class: "empty" }, query ? "No groups match your search." : "No groups found on this WhatsApp number."));
+    return;
+  }
+  root.replaceChildren(...matches.map((group) => h("div", { class: "row" },
+    h("div", {},
+      h("div", { class: "name" }, group.name,
+        group.participants_count ? h("span", { class: "chip" }, group.participants_count + " members") : null),
+      h("div", { class: "mono" }, group.id)),
+    h("div", { class: "controls" },
+      group.on_watchlist
+        ? h("span", { class: "status ok" }, "On watchlist")
+        : h("button", { type: "button", class: "primary", onclick: (e) => addGroup(group, e.target) }, "Add")))));
+}
+
+async function loadWhapiGroups(refresh) {
+  const root = document.getElementById("picker");
+  root.replaceChildren(h("div", { class: "empty" }, "Loading your groups…"));
+  await guarded(async () => {
+    state.whapi = await api("/whapi-groups" + (refresh ? "?refresh=true" : ""));
+    state.whapiLoaded = true;
+    renderPicker();
+  });
+}
+
+async function addGroup(group, button) {
+  button.disabled = true;
+  await guarded(async () => {
+    await api("/groups", { method: "POST", body: { id: group.id, name: group.name } });
+    group.on_watchlist = true;
+    await loadGroups();
+    renderPicker();
+  });
+  button.disabled = false;
+}
+
+document.getElementById("reload-watch").addEventListener("click", () => guarded(loadGroups));
+document.getElementById("reload-whapi").addEventListener("click", () => loadWhapiGroups(true));
+document.getElementById("filter").addEventListener("input", renderPicker);
+
+guarded(loadGroups);
+loadWhapiGroups(false);
+</script>
+</body>
+</html>

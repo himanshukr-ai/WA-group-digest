@@ -5,6 +5,7 @@ from dataclasses import dataclass, field
 from sqlalchemy.orm import Session
 
 from app.config import Settings
+from app.db.sync_groups import load_groups_from_db
 from app.summarize.pass1 import AnthropicLike
 from app.summarize.pass2 import build_digest, parse_window
 from app.whapi.schemas import WhapiMessage
@@ -36,23 +37,23 @@ def is_self_command(message: WhapiMessage, settings: Settings) -> bool:
     return message.chat_id == settings.self_chat_id and message.from_me and bool(message.text and message.text.body.strip())
 
 
-def _format_groups_list(settings: Settings) -> str:
-    groups = settings.load_groups()
+def _format_groups_list(session: Session) -> str:
+    groups = load_groups_from_db(session)
     if not groups:
-        return "No groups configured in groups.yaml."
+        return "No groups on the watchlist yet."
     lines = [f"{'✓' if g.enabled else '✗'} {g.name}" for g in groups]
     return "Watchlist:\n" + "\n".join(lines)
 
 
 def handle_command(
-    session: Session | None,
+    session: Session,
     anthropic_client: AnthropicLike | None,
     settings: Settings,
     command: ParsedCommand,
 ) -> str | None:
     """Return the reply text for a parsed self-chat command, or None if nothing should be sent."""
     if command.name == "groups":
-        return _format_groups_list(settings)
+        return _format_groups_list(session)
 
     if command.name == "digest":
         if not command.args:
@@ -65,7 +66,7 @@ def handle_command(
             return "ANTHROPIC_API_KEY is not configured."
         focus_group = " ".join(command.args[1:]) or None
         digest_text, _usage = build_digest(
-            session, anthropic_client, settings, settings.load_groups(), window_days, focus_group=focus_group
+            session, anthropic_client, settings, load_groups_from_db(session), window_days, focus_group=focus_group
         )
         return digest_text
 

@@ -51,8 +51,12 @@ def test_is_self_command_requires_self_chat_and_from_me():
 
 
 def test_handle_command_groups_lists_watchlist(db_env):
+    init_db()
     settings = get_settings()
-    reply = handle_command(None, None, settings, ParsedCommand(name="groups"))
+    with session_scope() as session:
+        sync_groups(session, settings.load_groups())
+    with session_scope() as session:
+        reply = handle_command(session, None, settings, ParsedCommand(name="groups"))
     assert "Site A Coordination" in reply
 
 

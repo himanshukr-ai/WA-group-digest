@@ -6,6 +6,7 @@ from fastapi import APIRouter, Request
 
 from app.config import Settings, get_settings
 from app.db.session import session_scope
+from app.db.sync_groups import load_groups_from_db
 from app.delivery.commands import ParsedCommand, handle_command, is_self_command, parse_command
 from app.ingest.persist import persist_message
 from app.whapi.client import WhapiClient
@@ -44,7 +45,6 @@ async def receive_webhook(request: Request) -> dict:
         return {"ingested": 0, "skipped_reason": "ignored_event_type"}
 
     settings = get_settings()
-    watchlist = {g.id: g for g in settings.load_groups() if g.enabled}
 
     raw_messages = body.get("messages", [])
     inserted = 0
@@ -52,6 +52,9 @@ async def receive_webhook(request: Request) -> dict:
     commands_handled = 0
 
     with session_scope() as session:
+        # Read per request so groups added/disabled from the admin page take effect immediately.
+        watchlist = {g.id: g for g in load_groups_from_db(session) if g.enabled}
+
         for message, raw in zip(payload.messages, raw_messages):
             if is_self_command(message, settings):
                 command = parse_command(message.text.body)

@@ -37,6 +37,11 @@ class Settings(BaseSettings):
 
     webhook_base_url: str = ""
 
+    # Basic-auth credentials for the /admin page. With no password set the page is disabled
+    # entirely (404), so it can never be reachable unauthenticated by accident.
+    admin_username: str = "admin"
+    admin_password: str = ""
+
     timezone: str = "Asia/Dubai"
     daily_digest_hour: int = 8
     enable_scheduler: bool = True

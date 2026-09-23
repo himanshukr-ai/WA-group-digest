@@ -73,8 +73,20 @@ docker compose up -d --build   # run app + Postgres on a VPS (see README.md)
   `RETENTION_DAYS`; `daily_summaries` are never deleted. Runs daily at 03:00 local time (a job in
   the same scheduler as the digest, added in `app/delivery/scheduler.py::create_scheduler`) and
   via `python -m app retention`.
-- `groups.yaml` — the group watchlist (id, name, enabled, notes). Source of truth; only enabled
-  groups are ingested or backfilled.
+- **Watchlist: the DB (`groups` table) is the source of truth**, read via
+  `app/db/sync_groups.py::load_groups_from_db` by the webhook (per request), scheduler,
+  `/groups`, and the CLI. `groups.yaml` only *seeds* an empty table on startup
+  (`seed_groups_if_empty`) and is never re-applied — the admin page edits the DB, and the yaml is
+  baked into the deployed image, so re-importing it would silently undo those edits. Only enabled
+  groups are ingested or summarized. Groups are never hard-deleted (disable instead: messages
+  reference them by FK).
+- `app/admin/` — the `/admin` page and its JSON API (`router.py`), Basic auth (`auth.py`), and
+  in-memory background backfill jobs (`jobs.py`; a restart loses job status, which is harmless
+  because backfill is idempotent). `static/index.html` is a single vanilla-JS file that builds all
+  DOM with `textContent` — group names are chosen by group admins, so never use `innerHTML` with
+  them. Auth fails closed: no `ADMIN_PASSWORD` means 404 for everything under `/admin`. Writes
+  require `Content-Type: application/json` (CSRF guard for Basic auth). `require_admin` must stay
+  first in the router's dependencies so unauthenticated writes get 401, not 415.
 - `app/whapi/webhook_setup.py` (`register_webhook`) — appends/updates *only this app's* entry
   (matched by URL) in the Whapi channel's `webhooks` array via `PATCH /settings`. **Never replaces
   the whole array** — this Whapi channel is shared with at least one other app (a "Zendox"
