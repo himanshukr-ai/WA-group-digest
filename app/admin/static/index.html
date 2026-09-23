@@ -71,6 +71,15 @@
     <div id="picker" class="picker"><div class="empty">Loading your groups…</div></div>
     <p class="sub" style="margin:12px 0 0">Every enabled group is included in the daily digest, and busy groups cost more to summarize.</p>
   </section>
+
+  <section>
+    <div class="head">
+      <h2>Member labels <span id="alias-count" class="chip"></span></h2>
+      <input id="alias-filter" type="search" placeholder="Search label or number…" aria-label="Search member labels">
+    </div>
+    <p class="sub" style="margin:0 0 8px">Members who only show up as a phone number appear in digests as a label (SMM1, SMM2, …). This is the key to who each one is. Keep it private.</p>
+    <div id="aliases" class="picker"><div class="empty">Loading…</div></div>
+  </section>
 </main>
 
 <script>
@@ -254,12 +263,40 @@ async function addGroup(group, button) {
   button.disabled = false;
 }
 
+// ---- member labels ---------------------------------------------------------------------------
+
+state.aliases = [];
+
+function renderAliases() {
+  const root = document.getElementById("aliases");
+  document.getElementById("alias-count").textContent = state.aliases.length;
+  const query = document.getElementById("alias-filter").value.trim().toLowerCase();
+  const matches = state.aliases.filter((a) => !query || a.label.toLowerCase().includes(query) || a.number.includes(query));
+  if (!matches.length) {
+    root.replaceChildren(h("div", { class: "empty" }, state.aliases.length ? "No labels match your search." : "No labels yet. They are created the first time a number-only member is summarized."));
+    return;
+  }
+  root.replaceChildren(...matches.map((a) => h("div", { class: "row" },
+    h("div", { class: "name" }, a.label),
+    h("div", { class: "mono" }, a.number))));
+}
+
+async function loadAliases() {
+  await guarded(async () => {
+    state.aliases = await api("/aliases");
+    renderAliases();
+  });
+}
+
+document.getElementById("alias-filter").addEventListener("input", renderAliases);
+
 document.getElementById("reload-watch").addEventListener("click", () => guarded(loadGroups));
 document.getElementById("reload-whapi").addEventListener("click", () => loadWhapiGroups(true));
 document.getElementById("filter").addEventListener("input", renderPicker);
 
 guarded(loadGroups);
 loadWhapiGroups(false);
+loadAliases();
 </script>
 </body>
 </html>

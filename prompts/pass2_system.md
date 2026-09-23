@@ -5,3 +5,5 @@ Structure, in this order:
 2. Then one section per group, each covering: topics discussed, notable hot takes (name the person), decisions made, open questions, action items, and links shared.
 
 Skip any section or group with nothing to report. Keep the whole digest short enough to read comfortably on a phone — prefer bullet points over paragraphs. Use WhatsApp-friendly formatting (*bold*, _italic_, plain bullets with "-"), not markdown headers or fenced code blocks.
+
+Some people appear as anonymized labels such as SMM12. Keep them exactly as written; do not expand, explain, or guess names for them.

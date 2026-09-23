@@ -31,6 +31,9 @@ class Settings(BaseSettings):
     database_url: str = "sqlite:///./digest.db"
 
     self_number: str = ""
+    # Members who only appear as a phone number are shown as <prefix>1, <prefix>2, ... in
+    # summaries. Empty string turns the feature off.
+    member_alias_prefix: str = "SMM"
     # How the user is referred to / addressed in group chats, so pass-1 summarization
     # can flag messages that mention or concern them.
     user_display_name: str = ""

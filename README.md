@@ -159,6 +159,24 @@ and Whapi quota, so treat it like a credential; Basic auth has no logout or lock
 strong one. To use it locally, put `ADMIN_PASSWORD` in `.env`, run `python -m app serve`, and open
 `http://localhost:8000/admin`.
 
+## Member labels (hiding phone numbers)
+
+WhatsApp only gives us a phone number for some group members. In digests those show up as stable
+labels — `SMM1`, `SMM2`, … — instead of the number. The same number always gets the same label,
+across groups, days and restarts.
+
+- **People with a real WhatsApp name keep it.** If we've seen a name for someone on any message,
+  it's used everywhere, including for their number-only messages.
+- **Where numbers are replaced:** sender lines, `@mentions`, quoted text, known numbers written in
+  the message text (`+971…`, `+971 58 594 9007`), and the final digest. Raw numbers stay in the
+  database; only what goes to Claude and into digests is scrubbed. A bare number in a message that
+  isn't a known member (an order number, say) is left alone.
+- **Who is SMM7?** The admin page's *Member labels* section lists every label with its number.
+  Keep that page private; it's the key.
+- **Old summaries fix themselves.** A cached day that names someone by number (from before this
+  existed) is rebuilt automatically the next time it's needed, which costs a few cents per day.
+- Change the prefix with `MEMBER_ALIAS_PREFIX`, or set it empty to turn labels off.
+
 ## Daily operation
 
 - **Scheduled digest:** every day at `DAILY_DIGEST_HOUR` (default 8) in `TIMEZONE` (default

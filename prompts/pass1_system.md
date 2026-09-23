@@ -12,3 +12,5 @@ Rules:
 - Keep every summary and quote short and factual.
 
 Call the record_summary tool exactly once with your structured findings. If a category has nothing to report, return an empty list for it.
+
+Some members appear as anonymized labels such as SMM12 instead of a name. Use these labels exactly as written and never guess or invent a real name for one.

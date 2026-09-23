@@ -13,7 +13,7 @@ from sqlalchemy import func, select
 from app.admin.auth import require_admin, require_json_for_writes
 from app.admin.jobs import AlreadyRunning, jobs
 from app.config import get_settings
-from app.db.models import Group, Message
+from app.db.models import Group, MemberAlias, Message
 from app.db.session import session_scope
 from app.whapi.client import WhapiClient
 
@@ -107,6 +107,15 @@ def _fetch_whapi_groups() -> list[dict]:
                 break
             offset += count
     return sorted(found, key=lambda g: g["name"].lower())
+
+
+@router.get("/api/aliases")
+def list_aliases() -> list[dict]:
+    """Which number each anonymized label (SMM7, ...) stands for. Admin-only by design."""
+    with session_scope() as session:
+        rows = session.execute(select(MemberAlias)).scalars().all()
+        rows.sort(key=lambda r: (len(r.label), r.label))  # SMM2 before SMM10
+        return [{"label": r.label, "number": r.local_id} for r in rows]
 
 
 @router.post("/api/groups", status_code=201)

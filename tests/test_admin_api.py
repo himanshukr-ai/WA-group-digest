@@ -137,6 +137,20 @@ def test_webhook_follows_admin_changes_without_a_restart(admin_client):
     assert admin_client.post("/webhook/whapi", json=payload, auth=None).json()["ingested"] == 0
 
 
+def test_alias_lookup_lists_labels_in_numeric_order(admin_client):
+    from app.db.session import session_scope
+    from app.summarize.aliases import Pseudonymizer
+
+    with session_scope() as session:
+        p = Pseudonymizer(session, "SMM")
+        for i in range(11):
+            p.alias_for(f"9715000000{i:02d}")
+
+    aliases = admin_client.get("/admin/api/aliases").json()
+    assert [a["label"] for a in aliases] == [f"SMM{i}" for i in range(1, 12)]  # SMM2 before SMM10
+    assert aliases[0] == {"label": "SMM1", "number": "971500000000"}
+
+
 # --- Whapi group picker ---------------------------------------------------------------------
 
 

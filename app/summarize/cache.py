@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 
 from app.config import GroupConfig, Settings
 from app.db.models import DailySummary, Message
+from app.summarize.aliases import Pseudonymizer, summary_has_raw_numbers
 from app.summarize.pass1 import AnthropicLike, summarize_day
 
 
@@ -23,6 +24,7 @@ def get_or_build_daily_summary(
     settings: Settings,
     group: GroupConfig,
     date: dt.date,
+    pseudo: Pseudonymizer | None = None,
 ) -> tuple[DailySummary, bool]:
     """Return the DailySummary for (group, date), generating and caching it if missing.
 
@@ -32,6 +34,8 @@ def get_or_build_daily_summary(
     """
     tz = ZoneInfo(settings.timezone)
     start, end = _day_bounds_utc(date, tz)
+    if pseudo is None:
+        pseudo = Pseudonymizer(session, settings.member_alias_prefix)
 
     existing = session.execute(
         select(DailySummary).where(DailySummary.group_id == group.id, DailySummary.summary_date == date)
@@ -40,7 +44,9 @@ def get_or_build_daily_summary(
         created_at = existing.created_at
         if created_at.tzinfo is None:  # SQLite hands back naive datetimes; we store UTC
             created_at = created_at.replace(tzinfo=dt.timezone.utc)
-        if created_at >= end:
+        # Also rebuild a summary that names people by phone number: it predates member labels.
+        stale_numbers = pseudo.enabled and summary_has_raw_numbers(existing.summary_json)
+        if created_at >= end and not stale_numbers:
             return existing, True
         session.delete(existing)
         session.flush()
@@ -54,7 +60,9 @@ def get_or_build_daily_summary(
         ).scalars()
     )
 
-    summary_json, input_tokens, output_tokens = summarize_day(client, settings, group.name, date, messages)
+    summary_json, input_tokens, output_tokens = summarize_day(
+        client, settings, group.name, date, messages, pseudo
+    )
 
     row = DailySummary(
         group_id=group.id,

@@ -6,6 +6,7 @@ from zoneinfo import ZoneInfo
 
 from app.config import Settings
 from app.db.models import Message
+from app.summarize.aliases import Pseudonymizer
 from app.summarize.prompts import render_prompt
 
 # Rough character budget per pass-1 call. Keeps a single day's messages comfortably
@@ -82,14 +83,20 @@ class AnthropicLike(Protocol):
     messages: Any
 
 
-def format_messages(messages: list[Message], tz: ZoneInfo) -> str:
+def format_messages(messages: list[Message], tz: ZoneInfo, pseudo: Pseudonymizer | None = None) -> str:
     lines = []
     for m in messages:
         local_time = m.timestamp_utc.astimezone(tz)
         body = m.text if m.text else f"<{m.type}>"
-        line = f"[{local_time:%H:%M}] {m.sender_name}: {body}"
-        if m.quoted_text:
-            line += f"\n    > {m.quoted_text}"
+        sender = m.sender_name
+        quoted = m.quoted_text
+        if pseudo is not None:
+            sender = pseudo.label_for(m.sender_id, m.sender_name)
+            body = pseudo.scrub(body)
+            quoted = pseudo.scrub(quoted) if quoted else quoted
+        line = f"[{local_time:%H:%M}] {sender}: {body}"
+        if quoted:
+            line += f"\n    > {quoted}"
         lines.append(line)
     return "\n".join(lines)
 
@@ -164,6 +171,7 @@ def summarize_day(
     group_name: str,
     date: dt.date,
     messages: list[Message],
+    pseudo: Pseudonymizer | None = None,
 ) -> tuple[dict, int, int]:
     """Summarize one group's messages for one day. Returns (summary_json, input_tokens, output_tokens)."""
     if not messages:
@@ -176,7 +184,7 @@ def summarize_day(
     total_input_tokens = 0
     total_output_tokens = 0
     for chunk in chunks:
-        text = format_messages(chunk, tz)
+        text = format_messages(chunk, tz, pseudo)
         result, input_tokens, output_tokens = _call_pass1(client, settings, group_name, date.isoformat(), text)
         results.append(result)
         total_input_tokens += input_tokens

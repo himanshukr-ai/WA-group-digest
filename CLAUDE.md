@@ -53,6 +53,13 @@ docker compose up -d --build   # run app + Postgres on a VPS (see README.md)
   - `pass2.py` (`build_digest`) pulls the cached per-day JSON for a window, asks Claude to merge
     it into one readable digest (mentions-of-user and open questions to them first, then
     per-group sections), and returns `(digest_text, usage)`.
+  - `aliases.py` (`Pseudonymizer`) replaces phone numbers with stable labels (`SMM1`, …; table
+    `member_aliases`, prefix `MEMBER_ALIAS_PREFIX`). It is applied in `format_messages` (senders,
+    bodies, quotes — so Claude never sees numbers), on the pass-2 input, and on the final digest
+    text. A real name we've ever seen for a number wins over a label. `cache.py` rebuilds any cached
+    day whose person fields hold a number (`summary_has_raw_numbers`) — that check exists because
+    Claude sometimes garbles digits when copying them, so an exact-match scrub can't catch old
+    cached output. Read cached JSON defensively: it doesn't always match the schema.
   - `usage.py` estimates cost from `Settings.anthropic_price_*_per_mtok` (approximate — update to
     match current Anthropic pricing) and logs it per run.
   - Prompts live in `prompts/*.md` (`$name`-style placeholders via `string.Template`), not inline

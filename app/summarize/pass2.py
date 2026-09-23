@@ -8,6 +8,7 @@ from zoneinfo import ZoneInfo
 from sqlalchemy.orm import Session
 
 from app.config import GroupConfig, Settings
+from app.summarize.aliases import Pseudonymizer
 from app.summarize.cache import get_or_build_daily_summary
 from app.summarize.pass1 import AnthropicLike
 from app.summarize.prompts import render_prompt
@@ -61,11 +62,16 @@ def build_digest(
     total_input_tokens = 0
     total_output_tokens = 0
 
+    # Numbers-only members are shown as stable labels (SMM1, ...). Label every such sender up
+    # front so numbers that only survive inside older cached summaries are scrubbed as well.
+    pseudo = Pseudonymizer(session, settings.member_alias_prefix)
+    pseudo.ensure_senders([g.id for g in target_groups])
+
     per_group_days: dict[str, dict[str, dict]] = {}
     for group in target_groups:
         day_entries: dict[str, dict] = {}
         for date in dates:
-            row, was_cached = get_or_build_daily_summary(session, client, settings, group, date)
+            row, was_cached = get_or_build_daily_summary(session, client, settings, group, date, pseudo)
             if not was_cached:
                 total_input_tokens += row.input_tokens
                 total_output_tokens += row.output_tokens
@@ -89,7 +95,7 @@ def build_digest(
         "pass2_user.md",
         window_description=window_description,
         user_name=settings.user_display_name or "the user",
-        groups_json=json.dumps(per_group_days, indent=2, ensure_ascii=False),
+        groups_json=pseudo.scrub(json.dumps(per_group_days, indent=2, ensure_ascii=False)),
     )
 
     response = client.messages.create(
@@ -102,7 +108,8 @@ def build_digest(
         system=system,
         messages=[{"role": "user", "content": user}],
     )
-    digest_text = "".join(block.text for block in response.content if block.type == "text")
+    # Final safety net in case the model echoes a raw number that appeared inside a quote.
+    digest_text = pseudo.scrub("".join(block.text for block in response.content if block.type == "text"))
     total_input_tokens += response.usage.input_tokens
     total_output_tokens += response.usage.output_tokens
 

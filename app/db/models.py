@@ -23,6 +23,16 @@ class Group(Base):
     notes: Mapped[str] = mapped_column(Text, default="")
 
 
+class MemberAlias(Base):
+    """Stable pseudonym (e.g. SMM7) for a member who only shows up as a phone number."""
+
+    __tablename__ = "member_aliases"
+
+    local_id: Mapped[str] = mapped_column(String, primary_key=True)  # the number/lid, without @suffix
+    label: Mapped[str] = mapped_column(String, unique=True)
+    created_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
 class Message(Base):
     __tablename__ = "messages"
 
